@@ -1,0 +1,70 @@
+import os
+import re
+import urllib.request
+import pandas as pd
+
+# 1. Download Leipzig Benchmark Data
+os.makedirs("data", exist_ok=True)
+base_url = "https://dbs.uni-leipzig.de/files/datasets/DBLP-Scholar"
+files = ["DBLP2.csv", "Scholar.csv", "DBLP-Scholar_perfectMapping.csv"]
+
+for f in files:
+    path = os.path.join("data", f)
+    if not os.path.exists(path):
+        print(f"Downloading {f}...")
+        try:
+            urllib.request.urlretrieve(f"{base_url}/{f}", path)
+        except Exception as e:
+            print(f"Failed to download {f}: {e}")
+
+# 2. Load Datasets
+print("Loading datasets...")
+dblp = pd.read_csv("data/DBLP2.csv", encoding="latin1")
+scholar = pd.read_csv("data/Scholar.csv", encoding="latin1")
+gold = pd.read_csv("data/DBLP-Scholar_perfectMapping.csv", encoding="latin1")
+
+dblp.columns = [c.strip().lower() for c in dblp.columns]
+scholar.columns = [c.strip().lower() for c in scholar.columns]
+gold.columns = [c.strip().lower() for c in gold.columns]
+
+print(f"DBLP records: {len(dblp)}")
+print(f"Scholar records: {len(scholar)}")
+print(f"Gold standard matches: {len(gold)}")
+
+# 3. Simple Text Normalization
+def clean_title(text):
+    if not isinstance(text, str):
+        return ""
+    text = text.lower()
+    text = re.sub(r"[^a-z0-9\s]", "", text)
+    return " ".join(text.split())
+
+dblp["clean_title"] = dblp["title"].apply(clean_title)
+scholar["clean_title"] = scholar["title"].apply(clean_title)
+
+# 4. Exact-Match Baseline Join
+matches = pd.merge(
+    dblp[["id", "clean_title"]],
+    scholar[["id", "clean_title"]],
+    on="clean_title",
+    suffixes=("_dblp", "_scholar")
+)
+
+pred_pairs = set(zip(matches["id_dblp"], matches["id_scholar"]))
+gold_pairs = set(zip(gold.iloc[:, 0], gold.iloc[:, 1]))
+
+tp = len(pred_pairs.intersection(gold_pairs))
+fp = len(pred_pairs - gold_pairs)
+fn = len(gold_pairs - pred_pairs)
+
+precision = tp / (tp + fp) if (tp + fp) else 0
+recall = tp / (tp + fn) if (tp + fn) else 0
+f1 = (2 * precision * recall) / (precision + recall) if (precision + recall) else 0
+
+print("\n=== BASELINE 1: EXACT MATCH RESULTS ===")
+print(f"True Positives:  {tp}")
+print(f"False Positives: {fp}")
+print(f"False Negatives: {fn}")
+print(f"Precision:       {precision:.4f} ({precision*100:.2f}%)")
+print(f"Recall:          {recall:.4f} ({recall*100:.2f}%)")
+print(f"F1 Score:        {f1:.4f}")
