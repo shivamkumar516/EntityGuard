@@ -1,0 +1,21 @@
+Error_Type,DBLP_ID,Scholar_ID,DBLP_Title,Scholar_Title
+False Positive (Impostor Match),conf/sigmod/Chamberlin03,Jjob6_YGJSQJ,XQuery: A Query Language for XML,XQuery: A Query Language for XML
+False Positive (Impostor Match),journals/sigmod/Aberer02a,url:http://portal.acm.org/ft_gateway.cfm%3Fid%3D776994%26type%3Dpdf%26dl%3DGUIDE%26dl%3DACM%26CFID%3D11111111%26CFTOKEN%3D2222222,Book Review Column,Book Review Column
+False Positive (Impostor Match),journals/sigmod/Aberer02a,url:http://portal.acm.org/ft_gateway.cfm%3Fid%3D604274%26type%3Dpdf%26dl%3DGUIDE%26dl%3DACM%26CFID%3D11111111%26CFTOKEN%3D2222222,Book Review Column,Book Review Column
+False Positive (Impostor Match),journals/sigmod/Widom96,-YhYDZ2AhfgJ,Editor's Notes,Editors' Notes
+False Positive (Impostor Match),journals/sigmod/Aberer02,url:http://portal.acm.org/ft_gateway.cfm%3Fid%3D565129%26type%3Dpdf%26dl%3DGUIDE%26dl%3DACM%26CFID%3D11111111%26CFTOKEN%3D2222222,Book Review Column,Book Review Column
+False Positive (Impostor Match),journals/sigmod/Liu02,zc1TRuoDDwgJ,Editor's Notes,Editors' Notes
+False Positive (Impostor Match),journals/sigmod/Liu02a,url:http://doi.wiley.com/10.1002/he.21,Editor's Notes,EditorÃ¢??s Notes
+False Positive (Impostor Match),journals/sigmod/Franklin00b,vgcXH5aVpdgJ,Editor's Notes,Editor's notes
+False Positive (Impostor Match),journals/sigmod/Franklin99a,skOc65LTInYJ,Editor's Notes,Editor's notes
+False Positive (Impostor Match),journals/sigmod/MeersmanS02,CqN0lBzsmEoJ,Guest Editor's Introduction,Guest Editor's Introduction
+False Negative (Missed True Match),journals/tods/MokNE96,xUeP4X8k5SoJ,A Normal Form for Precisely Characterizing Redundancy in Nested Relations,A Normal Form For Precisely Characterizig Redundancy in Nested Relations
+False Negative (Missed True Match),journals/sigmod/BhargavaAP95,ALJ4TObSDlIJ,Digital Library Services in Mobile Computing,Digital services in mobile computing
+False Negative (Missed True Match),conf/sigmod/GuhaRS98,WHHfHdG_ougJ,CURE: An Efficient Clustering Algorithm for Large Databases,CURE: An efficient clustering algorithm for large data databases
+False Negative (Missed True Match),journals/sigmod/FernandezFLS97,url:http://portal.acm.org/ft_gateway.cfm%3Fid%3D262763%26type%3Dpdf%26dl%3Dportal%26dl%3DACM%26CFID%3D11111111%26CFTOKEN%3D2222222,A Query Language for a Web-Site Management System,A Query Language for a Web-Site
+False Negative (Missed True Match),conf/sigmod/GarofalakisGR02,Hz7TBeGZRz8J,Querying and mining data streams: you only get one look a tutorial,andR. Rastogi. Querying and mining data streams: You only get one look
+False Negative (Missed True Match),conf/sigmod/HarinarayanRU96,uKGmcc4xUG4J,Implementing Data Cubes Efficiently,Implementing Data Cubes E-ciently
+False Negative (Missed True Match),conf/sigmod/BerckenDS00,Dy5Eeh8JzmgJ,javax.XXL: A prototype for a Library of Query processing Algorithms,XXL: A prototype for a library of query processing algorithms
+False Negative (Missed True Match),conf/vldb/RastogiS98,yztQfwBZU6EJ,PUBLIC: A Decision Tree Classifier that Integrates Building and Pruning,PUBLIC: A Decision Tree Classifier that Integrates Pruning and Building
+False Negative (Missed True Match),conf/sigmod/Blakeley96,37_iwO5NlgwJ,Data Access for the Masses through OLE DB,The Masses through OLE DB
+False Negative (Missed True Match),journals/vldb/JagadishACLNPPSWWY02,T1c1QfSdUVQJ,TIMBER: A native XML database,C. Yu.(2002). Timber: A native xml database
