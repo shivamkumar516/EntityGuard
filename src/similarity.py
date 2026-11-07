@@ -65,17 +65,47 @@ def levenshtein(a, b):
     return table[rows - 1][cols - 1]
 
 
+def levenshtein_two_rows(a, b):
+    """Section 17. Same distance as levenshtein, using only two rows.
+
+    The full table stores every D(i, j), so it needs O(m * n) space.
+    Row i is built only from row i - 1, so two lists are enough.
+    Space becomes O(n). The answer does not change.
+    """
+    a = "" if a is None else str(a)
+    b = "" if b is None else str(b)
+    previous = list(range(len(b) + 1))
+
+    for i in range(1, len(a) + 1):
+        current = [i]
+        for j in range(1, len(b) + 1):
+            if a[i - 1] == b[j - 1]:
+                cost = 0
+            else:
+                cost = 1
+            delete = previous[j] + 1
+            insert = current[j - 1] + 1
+            replace = previous[j - 1] + cost
+            current.append(min(delete, insert, replace))
+        previous = current
+
+    return previous[len(b)]
+
+
 def edit_similarity(a, b):
     """Section 16. Turn the edit count into a score between 0 and 1.
 
     S_edit = 1 - D(A, B) / max(length of A, length of B)
+
+    The distance comes from levenshtein_two_rows. Tests check that this
+    matches the full table in levenshtein.
     """
     a = "" if a is None else str(a)
     b = "" if b is None else str(b)
     longest = max(len(a), len(b))
     if longest == 0:
         return 1.0
-    return 1.0 - (levenshtein(a, b) / longest)
+    return 1.0 - (levenshtein_two_rows(a, b) / longest)
 
 
 def jaccard_similarity(tokens_a, tokens_b):
@@ -115,19 +145,77 @@ def ngram_similarity(text_a, text_b, n):
     return jaccard_similarity(char_ngrams(text_a, n), char_ngrams(text_b, n))
 
 
+def _clean_title_pair(title_a, title_b):
+    """Return the two cleaned titles, or (None, None) if either is missing."""
+    left = normalize_title(title_a)
+    right = normalize_title(title_b)
+    if left == "" or right == "":
+        return None, None
+    return left, right
+
+
+def title_exact(title_a, title_b):
+    """Section 44. 1 when the cleaned titles are the same, otherwise 0."""
+    left, right = _clean_title_pair(title_a, title_b)
+    if left is None:
+        return None
+    if left == right:
+        return 1.0
+    return 0.0
+
+
+def title_edit_similarity(title_a, title_b):
+    """Section 44. Edit similarity of the cleaned titles."""
+    left, right = _clean_title_pair(title_a, title_b)
+    if left is None:
+        return None
+    return edit_similarity(left, right)
+
+
+def title_token_jaccard(title_a, title_b):
+    """Section 44. Jaccard similarity of the title words."""
+    left, right = _clean_title_pair(title_a, title_b)
+    if left is None:
+        return None
+    return jaccard_similarity(left.split(), right.split())
+
+
+def title_ngram_jaccard(title_a, title_b, n):
+    """Section 44. Jaccard similarity of character n-grams.
+
+    n is 2 (bigram), 3 (trigram), or 4.
+    """
+    left, right = _clean_title_pair(title_a, title_b)
+    if left is None:
+        return None
+    return ngram_similarity(left, right, n)
+
+
 def title_similarity(title_a, title_b, alpha=0.4):
     """Section 20. Mix edit similarity and token Jaccard.
 
     S_title = alpha * S_edit + (1 - alpha) * S_jaccard
     alpha = 0.4 is only the example starting value.
+    compare_similarity.py tries other values of alpha.
     """
-    left = normalize_title(title_a)
-    right = normalize_title(title_b)
-    if left == "" or right == "":
+    left, right = _clean_title_pair(title_a, title_b)
+    if left is None:
         return None
     edit_score = edit_similarity(left, right)
     token_score = jaccard_similarity(left.split(), right.split())
     return (alpha * edit_score) + ((1.0 - alpha) * token_score)
+
+
+def title_length_ratio(title_a, title_b):
+    """Section 36. Shorter cleaned title length divided by the longer one.
+
+    This is one extra number for the optional ML feature vector.
+    The decision is still made from the similarity scores above.
+    """
+    left, right = _clean_title_pair(title_a, title_b)
+    if left is None:
+        return None
+    return min(len(left), len(right)) / max(len(left), len(right))
 
 
 def author_similarity_jaccard(authors_a, authors_b):
@@ -210,15 +298,40 @@ def year_similarity(year_a, year_b):
     return 0.0
 
 
+def combine_scores(scores, weights=None):
+    """Section 24. Weighted average, skipping any missing score.
+
+    S = sum(weight * score) / sum(weight)   over fields that are present.
+
+    A missing venue is left out. It is not treated as a similarity of 0.
+    """
+    if weights is None:
+        weights = WEIGHTS
+
+    weight_total = 0.0
+    weighted_sum = 0.0
+    for field, score in scores.items():
+        if score is None:
+            continue
+        weight_total += weights[field]
+        weighted_sum += weights[field] * score
+
+    if weight_total == 0:
+        return 0.0
+    return weighted_sum / weight_total
+
+
 def record_similarity(title_a, authors_a, venue_a, year_a,
                       title_b, authors_b, venue_b, year_b,
-                      author_method="jaccard", alpha=0.4):
+                      author_method="jaccard", alpha=0.4, weights=None):
     """Sections 23 and 24. One score for two whole records.
 
-    S = 0.50 * title + 0.30 * author + 0.10 * venue + 0.10 * year
+    Default:
+        S = 0.50 * title + 0.30 * author + 0.10 * venue + 0.10 * year
 
-    If a field is missing, its weight is removed and the other weights
-    are divided by the remaining weight total.
+    Pass a different weights dict to try another setting.
+    The four weights should add up to 1.
+    If a field is missing, combine_scores drops that weight.
     """
     if author_method == "jaccard":
         author_score = author_similarity_jaccard(authors_a, authors_b)
@@ -233,24 +346,28 @@ def record_similarity(title_a, authors_a, venue_a, year_a,
         "venue": venue_similarity(venue_a, venue_b),
         "year": year_similarity(year_a, year_b),
     }
-
-    weight_total = 0.0
-    weighted_sum = 0.0
-    for field, score in scores.items():
-        if score is None:
-            continue
-        weight_total += WEIGHTS[field]
-        weighted_sum += WEIGHTS[field] * score
-
-    if weight_total == 0:
-        return 0.0, scores
-    return weighted_sum / weight_total, scores
+    return combine_scores(scores, weights), scores
 
 
 if __name__ == "__main__":
     print("EDIT DISTANCE")
     print("algorithm -> algorithms:", levenshtein("algorithm", "algorithms"))
+    print("two-row check:         ", levenshtein_two_rows("algorithm", "algorithms"))
     print("edit similarity:", round(edit_similarity("algorithm", "algorithms"), 4))
+    print()
+
+    print("TITLE MEASURES")
+    left_title = "An Efficient Algorithm for Entity Matching"
+    right_title = "Efficient Algorithms for Entity Matching"
+    print("exact   ", title_exact(left_title, right_title))
+    print("edit    ", round(title_edit_similarity(left_title, right_title), 4))
+    print("jaccard ", round(title_token_jaccard(left_title, right_title), 4))
+    print("bigram  ", round(title_ngram_jaccard(left_title, right_title, 2), 4))
+    print("trigram ", round(title_ngram_jaccard(left_title, right_title, 3), 4))
+    print("fourgram", round(title_ngram_jaccard(left_title, right_title, 4), 4))
+    print("combined", round(title_similarity(left_title, right_title), 4))
+    print(normalize_title(left_title))
+    print(normalize_title(right_title))
     print()
 
     print("JACCARD")
@@ -262,14 +379,6 @@ if __name__ == "__main__":
     print("N-GRAMS OF database")
     print("bigrams ", char_ngrams("database", 2))
     print("trigrams", char_ngrams("database", 3))
-    print()
-
-    print("TITLE PAIR FROM THE PROBLEM STATEMENT")
-    left_title = "An Efficient Algorithm for Entity Matching"
-    right_title = "Efficient Algorithms for Entity Matching"
-    print(normalize_title(left_title))
-    print(normalize_title(right_title))
-    print("title similarity", round(title_similarity(left_title, right_title), 4))
     print()
 
     print("TWO AUTHOR METHODS")
