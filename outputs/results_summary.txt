@@ -1,0 +1,9 @@
+Search space: 168,112,008 cross-source pairs (2,616 DBLP × 64,263 Scholar), 5,347 gold matches.
+Multi-pass blocking produced 459,743 candidates: reduction ratio 99.7265%, blocking recall 98.04%, in 8.5s.
+Year blocking alone would give 4,267,488 pairs with only 45.3% recall (54% of Scholar has no year).
+Validation chose α=0.6, weights (title, author, venue, year)=(0.45, 0.3, 0.05, 0.2), author measure 'author_best', venue measure 'venue_tok', T=0.65.
+Test F1: exact-title baseline 0.632 → weighted + blocking 0.886 (precision 0.881, recall 0.891).
+Best method on test: M4 Weighted + multi-pass blocking with F1 0.886.
+Confidence bands: S ≥ 0.9 high confidence, 0.49–0.9 manual review, < 0.49 likely non-match.
+A pure-Python scorer would need ≈ 29.7 h for all pairs; blocking + matching took 16s.
+Without blocking (M3) the same weighted score reached F1 0.856 (recall 0.854); with blocking (M4) only 0.27% of the pairs are scored and recall changes by +3.7 points.

@@ -1,0 +1,96 @@
+{
+  "dataset": {
+    "dblp": 2616,
+    "scholar": 64263,
+    "gold": 5347,
+    "cartesian_pairs": 168112008
+  },
+  "blocking": {
+    "candidates": 459743,
+    "reduction_ratio": 0.9972652578154917,
+    "blocking_recall": 0.9803628202730503,
+    "time_s": 8.509557723999023
+  },
+  "chosen": {
+    "alpha": 0.6,
+    "weights_title_author_venue_year": [
+      0.45,
+      0.3,
+      0.05,
+      0.2
+    ],
+    "author_measure": "author_best",
+    "venue_measure": "venue_tok",
+    "threshold": 0.65,
+    "band_high": 0.9,
+    "band_low": 0.49
+  },
+  "test_results": [
+    {
+      "method": "B1  Exact normalized title",
+      "time_s": 0.057092905044555664,
+      "threshold": "\u2014",
+      "TP": 567,
+      "FP": 191,
+      "FN": 468,
+      "precision": 0.7480211081794196,
+      "recall": 0.5478260869565217,
+      "f1": 0.6324595649749023
+    },
+    {
+      "method": "B2  Fuzzy title (edit sim), no blocking",
+      "time_s": 82.4384412765503,
+      "threshold": 0.7,
+      "TP": 904,
+      "FP": 422,
+      "FN": 131,
+      "precision": 0.6817496229260935,
+      "recall": 0.8734299516908213,
+      "f1": 0.7657772130453198
+    },
+    {
+      "method": "M3  Weighted multi-attribute, no blocking",
+      "time_s": 82.4384412765503,
+      "threshold": 0.58,
+      "TP": 884,
+      "FP": 146,
+      "FN": 151,
+      "precision": 0.858252427184466,
+      "recall": 0.8541062801932368,
+      "f1": 0.856174334140436
+    },
+    {
+      "method": "M4  Weighted + multi-pass blocking",
+      "time_s": 16.05531883239746,
+      "threshold": 0.65,
+      "TP": 922,
+      "FP": 124,
+      "FN": 113,
+      "precision": 0.8814531548757171,
+      "recall": 0.8908212560386474,
+      "f1": 0.8861124459394523
+    },
+    {
+      "method": "M5  Logistic Regression + blocking",
+      "time_s": 16.05531883239746,
+      "threshold": 0.81,
+      "TP": 905,
+      "FP": 107,
+      "FN": 130,
+      "precision": 0.8942687747035574,
+      "recall": 0.8743961352657005,
+      "f1": 0.8842208109428431
+    },
+    {
+      "method": "M5b Decision Tree + blocking",
+      "time_s": 16.05531883239746,
+      "threshold": 0.6,
+      "TP": 913,
+      "FP": 116,
+      "FN": 122,
+      "precision": 0.8872691933916423,
+      "recall": 0.8821256038647343,
+      "f1": 0.8846899224806202
+    }
+  ]
+}
