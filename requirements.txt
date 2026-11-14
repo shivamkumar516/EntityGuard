@@ -1,4 +1,21 @@
-pandas
-numpy
-scikit-learn
-tqdm
+# Exact versions tested together on Windows 11 / Python 3.11 (needs Python 3.11 or newer).
+#   python -m pip install -r requirements.txt
+
+# core pipeline (src/pipeline.py, notebook)
+numpy==2.3.5
+pandas==2.3.3
+scipy==1.17.1
+scikit-learn==1.9.1     # only for training; the app loads the portable outputs/*_model.json
+rapidfuzz==3.14.6
+joblib==1.6.0
+tqdm==4.70.1
+matplotlib==3.10.7
+
+# web apps: app.py (Gradio) and src/api (FastAPI + Gradio)
+gradio==6.31.0
+fastapi==0.162.2
+uvicorn==0.54.0
+httpx==0.28.1
+
+# tests
+pytest==9.2.0

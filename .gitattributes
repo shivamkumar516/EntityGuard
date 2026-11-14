@@ -1,2 +1,6 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# launchers: keep Windows line endings for .bat, Unix for .sh
+*.bat text eol=crlf
+*.sh text eol=lf
