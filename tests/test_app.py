@@ -104,6 +104,19 @@ def test_search_and_resolve_both_directions(app_env):
     assert by_title[3]["id"] == d
     label = f"{d}: {title[:100]}"                              # the dropdown's 'id: title' label
     assert h["resolve"]("DBLP → find Scholar matches", label, ALL_PASSES, 15, False)[3]["id"] == d
+    with pytest.raises(gr.Error, match="switch the Query source"):          # DBLP id under the Scholar radio
+        h["resolve"]("Scholar → find DBLP matches", d, ALL_PASSES, 15, False)
+    _, blank_msg = h["search"]("DBLP → find Scholar matches", "   ")
+    assert "Type some title words" in blank_msg
+
+
+def test_load_ids_blank_and_swapped(app_env):
+    h, eng, *_ = app_env
+    d, s = eng.gold_df.iloc[0][["dblp_id", "scholar_id"]]
+    with pytest.raises(gr.Error, match="Enter both"):
+        h["load_ids"]("", s, False)
+    with pytest.raises(gr.Error, match="wrong boxes"):
+        h["load_ids"](s, d, False)
 
 
 def test_pick_candidate_row(app_env):

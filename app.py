@@ -207,10 +207,18 @@ def create_demo(engine, stored, meta, review_csv=REVIEW_CSV):
                 "" if _missing(rec["year"]) else str(rec["year"])]
 
     def load_ids(dblp_id, scholar_id, show_gold):
+        dblp_id, scholar_id = str(dblp_id or "").strip(), str(scholar_id or "").strip()
+        if not dblp_id or not scholar_id:
+            raise gr.Error("Enter both a DBLP id and a Scholar id (or press Random gold pair).")
         try:
             d, s = engine.record("dblp", dblp_id), engine.record("scholar", scholar_id)
+            swapped = (d is None and s is None and engine.record("dblp", scholar_id) is not None
+                       and engine.record("scholar", dblp_id) is not None)
         except RuntimeError as e:
             raise gr.Error(str(e))
+        if swapped:
+            raise gr.Error("The two ids are in the wrong boxes: put the DBLP id (e.g. conf/sigmod/...) on the left "
+                           "and the Scholar id on the right.")
         if d is None or s is None:
             raise gr.Error(f"Unknown {'DBLP' if d is None else 'Scholar'} id: "
                            f"{(dblp_id if d is None else scholar_id)!r}")
@@ -233,6 +241,8 @@ def create_demo(engine, stored, meta, review_csv=REVIEW_CSV):
         return "dblp" if src.startswith("DBLP") else "scholar"
 
     def search(src, text):
+        if not str(text or "").strip():
+            return gr.Dropdown(choices=[], value=None), "Type some title words or an exact id, then press Search."
         try:
             hits = engine.search(_side(src), text)
         except RuntimeError as e:
@@ -265,6 +275,11 @@ def create_demo(engine, stored, meta, review_csv=REVIEW_CSV):
             rec = lookup_record(side, rid)
         except RuntimeError as e:
             raise gr.Error(str(e))
+        if rec is None and str(rid or "").strip():
+            other_side = "scholar" if side == "dblp" else "dblp"
+            hint = (f" It is a {other_side.upper()} record: switch the Query source."
+                    if lookup_record(other_side, rid) is not None else " Search again and pick from the list.")
+            raise gr.Error(f"No {side.upper()} record matches {str(rid).strip()[:80]!r}.{hint}")
         if rec is None:
             raise gr.Error("Pick a record first (search by title words or id, or press Random).")
         info, df = engine.resolve(rec, side, passes, int(top_k))
@@ -551,6 +566,9 @@ def create_demo(engine, stored, meta, review_csv=REVIEW_CSV):
                 b_run = gr.Button("Run multi-pass blocking")
                 b_df = gr.Dataframe(interactive=False)
             res_out = [q_sum, q_keys, q_df, q_state, q_msg, q_rec, q_dec, q_scores, q_why]
+            # a new query source invalidates the record list of the old one
+            q_src.change(lambda: (gr.Dropdown(choices=[], value=None), "Query source changed: search again."),
+                         None, [q_pick, q_msg])
             q_search.click(search, [q_src, q_text], [q_pick, q_msg])
             q_text.submit(search, [q_src, q_text], [q_pick, q_msg])
             q_run.click(resolve, [q_src, q_pick, q_passes, q_k, show_gold], res_out)
