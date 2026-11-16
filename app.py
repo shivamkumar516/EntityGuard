@@ -242,12 +242,27 @@ def create_demo(engine, stored, meta, review_csv=REVIEW_CSV):
             return gr.Dropdown(choices=[], value=None), f"No {_side(src).upper()} record matches {text!r}."
         return gr.Dropdown(choices=choices, value=choices[0][1]), f"{len(choices)} record(s) found; pick one and press Resolve."
 
+    def lookup_record(side, rid):
+        """Record by exact id, by an 'id: title' dropdown label, or (typed into the box) by its title."""
+        rid = str(rid or "").strip()
+        if not rid:
+            return None
+        rec = engine.record(side, rid)
+        if rec is None and ": " in rid:
+            rec = engine.record(side, rid.split(": ", 1)[0])
+        if rec is None:
+            hits = engine.search(side, rid, limit=50)
+            if len(hits):
+                exact = hits[hits["title"].fillna("").str.strip().str.lower() == rid.lower()]
+                rec = engine.record(side, (exact if len(exact) else hits)["id"].iloc[0])
+        return rec
+
     def resolve(src, rid, passes, top_k, show_gold):
         side = _side(src)
         if not passes:
             raise gr.Error("Select at least one blocking pass.")
         try:
-            rec = engine.record(side, rid or "")
+            rec = lookup_record(side, rid)
         except RuntimeError as e:
             raise gr.Error(str(e))
         if rec is None:

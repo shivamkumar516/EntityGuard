@@ -99,6 +99,11 @@ def test_search_and_resolve_both_directions(app_env):
         h["resolve"]("DBLP → find Scholar matches", d, [], 15, False)          # no pass selected
     with pytest.raises(gr.Error):
         h["resolve"]("DBLP → find Scholar matches", None, ALL_PASSES, 15, False)   # nothing picked
+    title = eng.record("dblp", d)["title"]                     # a title typed into the Record box
+    by_title = h["resolve"]("DBLP → find Scholar matches", title, ALL_PASSES, 15, False)
+    assert by_title[3]["id"] == d
+    label = f"{d}: {title[:100]}"                              # the dropdown's 'id: title' label
+    assert h["resolve"]("DBLP → find Scholar matches", label, ALL_PASSES, 15, False)[3]["id"] == d
 
 
 def test_pick_candidate_row(app_env):
