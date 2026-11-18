@@ -1,9 +1,8 @@
 """EntityGuard pipeline: the working logic of experiments/EntityGuard_Student3.ipynb in one module.
 
-This module is self-contained. It does NOT import src/normalize.py, src/similarity.py,
-src/compare_similarity.py or src/matching/*; the reference logic the notebook used is reproduced
-here, with identical results (tests/test_pipeline.py checks it against the notebook's stored
-MATCH_RESULT table and against the numbers in outputs/summary.json).
+The scoring and decision logic is maintained here. Candidate generation is provided by the
+Student 2 module in src/blocking and imported below, so the web application and batch pipeline
+share one reusable blocking implementation.
 
     data/DBLP.csv, data/Scholar.csv, data/DBLP-Scholar_perfectMapping.csv
         -> load_datasets()             encodings: DBLP latin-1, Scholar utf-8 with BOM
@@ -28,7 +27,6 @@ import re
 import threading
 import time
 import warnings
-from collections import Counter, defaultdict
 from datetime import datetime
 
 import numpy as np
@@ -36,6 +34,7 @@ import pandas as pd
 
 from .evaluation import best_threshold, prf, threshold_sweep
 from .evaluation.split import split_labels
+from .blocking import BlockingIndex, PASS_CAPS, PASS_LABELS, PASS_NAMES
 
 try:                                    # C implementation of the same edit distance, used for bulk scoring
     from rapidfuzz.distance import Levenshtein as _RFLevenshtein
@@ -588,144 +587,9 @@ def train_models(train, val, n_gold_val, neg_per_pos=20, seed=SEED):
 
 
 # ====================================================================== 8. multi-pass blocking
-PASS_NAMES = ("title_prefix", "rare_tokens", "char_prefix", "rare_char6")
-PASS_CAPS = {"title_prefix": None, "rare_tokens": 1000, "char_prefix": None, "rare_char6": 500}
-PASS_LABELS = {
-    "title_prefix": "Title prefix (first significant token)",
-    "rare_tokens": "Rare title tokens (3 rarest, rarity = log(N / (DF+1)))",
-    "char_prefix": "Character prefix (first 3 chars of first 2 tokens)",
-    "rare_char6": "Rare character 6-grams (title without spaces)",
-}
-
-
-def _grams6(squashed):
-    return {squashed[i:i + 6] for i in range(len(squashed) - 5)}
-
-
-class BlockingIndex:
-    """Multi-pass blocking (Sections 26-30) over DBLP x Scholar, reusable for single queries.
-
-    Document frequencies come from the titles of both sources only (never from the gold mapping).
-    Each pass gives every record a few keys; a DBLP and a Scholar record become a candidate pair
-    when they share a key (blocks with more Scholar records than the pass's cap are skipped).
-    The candidate set is the union of the passes: C = C1 ∪ C2 ∪ C3 ∪ C4.
-    """
-
-    def __init__(self, dblp, scholar):
-        d_tok, s_tok = dblp["t_tokens"].tolist(), scholar["t_tokens"].tolist()
-        d_sq, s_sq = dblp["t_squash"].tolist(), scholar["t_squash"].tolist()
-        self.n_d, self.n_s = len(d_tok), len(s_tok)
-        self.n_docs = self.n_d + self.n_s
-        self.tok_df = Counter(t for toks in d_tok + s_tok for t in set(toks))
-        self.gram_df = Counter(g for sq in d_sq + s_sq for g in _grams6(sq))
-        self.d_keys = {p: [self.keys(p, t, sq) for t, sq in zip(d_tok, d_sq)] for p in PASS_NAMES}
-        self.s_keys = {p: [self.keys(p, t, sq) for t, sq in zip(s_tok, s_sq)] for p in PASS_NAMES}
-        self.index = {p: self._invert(self.s_keys[p]) for p in PASS_NAMES}      # Scholar blocks
-        self.d_index = {p: self._invert(self.d_keys[p]) for p in PASS_NAMES}    # DBLP blocks (Scholar-side queries)
-
-    @staticmethod
-    def _invert(key_lists):
-        blocks = defaultdict(list)
-        for row, ks in enumerate(key_lists):
-            for k in ks:
-                blocks[k].append(row)
-        return {k: np.asarray(v, dtype=np.int64) for k, v in blocks.items()}
-
-    def rarity(self, token, external=False):
-        """log(N / (DF + 1)); an external record counts itself in N and DF."""
-        e = int(external)
-        return math.log((self.n_docs + e) / (self.tok_df.get(token, 0) + e + 1))
-
-    def keys(self, pass_name, tokens, squashed, external=False):
-        """Blocking keys of one record for one pass (sorted, duplicates removed)."""
-        if pass_name == "title_prefix":
-            ks = tokens[:1]
-        elif pass_name == "rare_tokens":
-            ks = sorted(set(tokens), key=lambda t: (-self.rarity(t, external), t))[:3]
-        elif pass_name == "char_prefix":
-            ks = ["".join(t[:3] for t in tokens[:2])] if tokens else []
-        elif pass_name == "rare_char6":
-            e = int(external)
-            gs = [g for g in _grams6(squashed) if self.gram_df.get(g, 0) + e >= 2]
-            ks = sorted(gs, key=lambda g: (self.gram_df.get(g, 0) + e, g))[:5]
-        else:
-            raise ValueError(f"unknown blocking pass {pass_name!r}; choose from {PASS_NAMES}")
-        return sorted(set(ks))
-
-    def record_keys(self, rec, external=True):
-        return {p: self.keys(p, rec["t_tokens"], rec["t_squash"], external) for p in PASS_NAMES}
-
-    def _block(self, p, k, extra=0):
-        rows = self.index[p].get(k)
-        if rows is None:
-            return None
-        cap = PASS_CAPS[p]
-        return None if cap and len(rows) + extra > cap else rows
-
-    def candidates(self, keys_by_pass, passes=PASS_NAMES):
-        """{scholar_row: [passes that generated it]} for one DBLP-side record."""
-        out = defaultdict(list)
-        for p in passes:
-            rows = set()
-            for k in keys_by_pass[p]:
-                b = self._block(p, k)
-                if b is not None:
-                    rows.update(b.tolist())
-            for r in rows:
-                out[r].append(p)
-        return dict(out)
-
-    def candidates_for_scholar(self, keys_by_pass, passes=PASS_NAMES, external=False):
-        """{dblp_row: [passes]} for one Scholar-side record (same blocks and caps, seen from the other side)."""
-        out = defaultdict(list)
-        for p in passes:
-            rows = set()
-            for k in keys_by_pass[p]:
-                cap = PASS_CAPS[p]
-                if cap and len(self.index[p].get(k, ())) + int(external) > cap:
-                    continue
-                b = self.d_index[p].get(k)
-                if b is not None:
-                    rows.update(b.tolist())
-            for r in rows:
-                out[r].append(p)
-        return dict(out)
-
-    def pair_check(self, d_keys, s_keys, s_external=False):
-        """{pass: shared keys that put this DBLP / Scholar pair in the same (allowed) block}."""
-        res = {}
-        for p in PASS_NAMES:
-            shared = set(d_keys[p]) & set(s_keys[p])
-            ok = []
-            for k in sorted(shared):
-                size = len(self.index[p].get(k, ())) + int(s_external)
-                if not PASS_CAPS[p] or size <= PASS_CAPS[p]:
-                    ok.append(k)
-            res[p] = ok
-        return res
-
-    def run_all(self, passes=PASS_NAMES):
-        """Blocking for every DBLP record. Returns (union keys, {pass: keys}, {pass: seconds}).
-
-        A pair is stored as the integer key dblp_row * n_scholar + scholar_row; np.unique over the
-        concatenation is the de-duplicated union (equivalent to a set of (dblp_id, scholar_id)).
-        """
-        per_pass, times = {}, {}
-        for p in passes:
-            t0 = time.time()
-            bd = defaultdict(list)
-            for d, ks in enumerate(self.d_keys[p]):
-                for k in ks:
-                    bd[k].append(d)
-            parts = []
-            for k, d_rows in bd.items():
-                b = self._block(p, k)
-                if b is not None:
-                    parts.append(np.add.outer(np.asarray(d_rows, dtype=np.int64) * self.n_s, b).ravel())
-            per_pass[p] = np.unique(np.concatenate(parts)) if parts else np.array([], dtype=np.int64)
-            times[p] = time.time() - t0
-        union = np.unique(np.concatenate(list(per_pass.values()))) if per_pass else np.array([], dtype=np.int64)
-        return union, per_pass, times
+# BlockingIndex and pass configuration are implemented in src.blocking (Student 2).
+# The application imports that implementation directly so notebook and app logic
+# no longer maintain separate candidate-generation implementations.
 
 
 # ====================================================================== 9. explanation
