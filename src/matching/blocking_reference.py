@@ -1,8 +1,8 @@
-"""REFERENCE multi-pass blocking (Sections 26-30), used until Student 2 provides src/blocking/.
+"""Legacy reference multi-pass blocking retained for regression comparisons.
 
-Blocking is Student 2's component. This is Student 3's reference version so the experiments
-and the web app can run end to end. It works on the normalized title tokens produced by
-Student 1's normalization (see src/matching/features.add_normalized_columns).
+The application now uses ``src.blocking`` as its canonical implementation. This module remains
+available for comparison tests and historical benchmark reproduction. It accepts normalized
+frames; raw frames are normalized on entry for backwards-compatible test and experiment use.
 
 Each pass produces a candidate set C_i; the final set is C = C_1 ∪ ... ∪ C_k (duplicates removed).
 Pairs are integer keys  dblp_row * n_scholar + scholar_row  (a fast stand-in for a set of
@@ -21,6 +21,8 @@ import time
 from collections import Counter, defaultdict
 
 import numpy as np
+
+from src.matching.features import add_normalized_columns
 
 PASS_NAMES = ("title_prefix", "rare_tokens", "char_prefix", "rare_char6")
 
@@ -53,6 +55,19 @@ def run_blocking(dblp, scholar, s_rows=None, passes=PASS_NAMES):
     dblp / scholar need the columns t_tokens and t_squash.
     Returns (union_keys, {pass: keys}, {pass: seconds}).
     """
+    if not {"t_tokens", "t_squash"}.issubset(dblp.columns):
+        dblp = dblp.copy()
+        for column in ("authors", "venue", "year"):
+            if column not in dblp:
+                dblp[column] = None
+        add_normalized_columns(dblp)
+    if not {"t_tokens", "t_squash"}.issubset(scholar.columns):
+        scholar = scholar.copy()
+        for column in ("authors", "venue", "year"):
+            if column not in scholar:
+                scholar[column] = None
+        add_normalized_columns(scholar)
+
     n_s = len(scholar)
     s_rows = np.arange(n_s) if s_rows is None else np.asarray(s_rows)
     d_tok = dblp.t_tokens.to_list(); s_tok = scholar.t_tokens.iloc[s_rows].to_list()

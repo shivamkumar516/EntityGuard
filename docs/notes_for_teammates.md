@@ -24,11 +24,11 @@ None of your files were changed. These are things found while plugging your code
 1. **Cell 5 overwrites `candidate_pairs.csv`** with the year-prefix pairs only, so the de-duplication demo after it removes 0 duplicates. Write each pass to its own file, or de-duplicate the union of all passes.
 2. **Hard-coded `/content/drive/MyDrive/...` paths** — the notebook only runs in one person's Drive. A `BASE` folder variable (as in the experiment notebook) would make it portable.
 3. **No before/after timing for the indexes:** time the same lookup query with and without `CREATE INDEX`, so the report can show what indexing buys.
-4. **Blocking as a module.** The experiments and the web app use a reference blocking (`src/matching/blocking_reference.py`, recall 98.07 %, 462,813 candidates). When yours is a module, it can be swapped in if it provides:
+4. **Blocking module integration (implemented in this update).** `src/blocking/candidate_generation.py` is now the canonical blocking implementation imported by `src/pipeline.py`. The former in-pipeline `BlockingIndex` has been moved into the Student 2 module while preserving the query-time methods required by the app. The public `candidate_pairs(dblp, scholar)` interface remains available:
 
    ```python
    # src/blocking/__init__.py
    def candidate_pairs(dblp, scholar) -> set[tuple[str, str]]:   # {(dblp_id, scholar_id), ...}
    ```
 
-   In the notebook, convert the pairs to keys with `D_IDX[d] * N_S + S_IDX[s]` (Section 9).
+   The module also exposes `run_blocking` and `generate_candidate_details` for experiments and per-rule diagnostics. The old `src/matching/blocking_reference.py` is retained only for regression comparison.
